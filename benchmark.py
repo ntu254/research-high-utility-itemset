@@ -36,6 +36,8 @@ def run_spmf(algorithm: str, dataset_path: Path, output_path: Path, min_util: in
         "-XX:+UseG1GC",
         "-Xms256m",
         "-Xmx2g",
+        "-XX:CICompilerCount=2",
+        "-XX:+AlwaysPreTouch",
         "-cp",
         cp,
         "ca.pfv.spmf.gui.Main",
