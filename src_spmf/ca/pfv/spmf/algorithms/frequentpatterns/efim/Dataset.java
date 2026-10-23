@@ -78,39 +78,69 @@ public class Dataset {
      * @return a transaction
      */
     private Transaction createTransaction(String line) {
-    	// split the line into tokens according to the ":" separator
-    	String[] split = line.split(":");
-    	
-    	// Get the transaction utility
-    	int transactionUtility = Integer.parseInt(split[1]);
-    	
-    	// Get the list of items 
-        String[] itemsString = split[0].split(" ");
-    	
-        // Get the list of item utilities
-        String[] itemsUtilitiesString = split[2].split(" ");
-    	
-        //Create array to store the items and their utilities
-        int[] items = new  int[itemsString.length];
-        int[] utilities = new  int[itemsString.length];
+        int len = line.length();
+        int colon1 = line.indexOf(':');
+        int colon2 = line.indexOf(':', colon1 + 1);
 
-        // for each item
-        for (int i = 0; i < items.length; i++) {
-        	//store the item
-        	items[i] = Integer.parseInt(itemsString[i]);
-        	
-        	// store its utility in that transaction
-        	utilities[i] = Integer.parseInt(itemsUtilitiesString[i]);
-            
-            // if the item name is larger than the largest item read from the database until now, we remember
-        	// its name
-            if(items[i] > maxItem) {
-                maxItem = items[i];
+        int transactionUtility = 0;
+        for (int i = colon1 + 1; i < colon2; i++) {
+            char c = line.charAt(i);
+            if (c >= '0' && c <= '9') {
+                transactionUtility = transactionUtility * 10 + (c - '0');
             }
         }
 
-		// create the transaction object for this transaction and return it
-		return new Transaction(items, utilities, transactionUtility);
+        int itemCount = 0;
+        boolean inToken = false;
+        for (int i = 0; i < colon1; i++) {
+            char c = line.charAt(i);
+            if (c != ' ') {
+                if (!inToken) {
+                    itemCount++;
+                    inToken = true;
+                }
+            } else {
+                inToken = false;
+            }
+        }
+
+        int[] items = new int[itemCount];
+        int[] utilities = new int[itemCount];
+
+        int idx = 0;
+        int currentVal = 0;
+        inToken = false;
+        for (int i = 0; i <= colon1; i++) {
+            char c = (i == colon1) ? ' ' : line.charAt(i);
+            if (c >= '0' && c <= '9') {
+                currentVal = currentVal * 10 + (c - '0');
+                inToken = true;
+            } else if (inToken) {
+                items[idx++] = currentVal;
+                if (currentVal > maxItem) {
+                    maxItem = currentVal;
+                }
+                currentVal = 0;
+                inToken = false;
+            }
+        }
+
+        idx = 0;
+        currentVal = 0;
+        inToken = false;
+        for (int i = colon2 + 1; i <= len; i++) {
+            char c = (i == len) ? ' ' : line.charAt(i);
+            if (c >= '0' && c <= '9') {
+                currentVal = currentVal * 10 + (c - '0');
+                inToken = true;
+            } else if (inToken) {
+                utilities[idx++] = currentVal;
+                currentVal = 0;
+                inToken = false;
+            }
+        }
+
+        return new Transaction(items, utilities, transactionUtility);
     }
 
     /**
