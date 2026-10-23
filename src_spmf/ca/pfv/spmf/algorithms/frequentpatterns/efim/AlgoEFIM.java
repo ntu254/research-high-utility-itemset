@@ -238,14 +238,10 @@ public class AlgoEFIM {
 
 		// We now loop over each transaction from the dataset
 		// to remove unpromising items
-		for (int i = 0; i < dataset.getTransactions().size(); i++) {
-			// Get the transaction
-			Transaction transaction = dataset.getTransactions().get(i);
-
-			// Remove unpromising items from the transaction and at the same time
-			// rename the items in the transaction according to their new names
-			// and sort the transaction by increasing TWU order
-			transaction.removeUnpromisingItems(oldNameToNewNames);
+		ListObject<Transaction> initialTxs = dataset.transactions;
+		int txCount = initialTxs.size();
+		for (int i = 0; i < txCount; i++) {
+			initialTxs.get(i).removeUnpromisingItems(oldNameToNewNames);
 		}
 
 		// Now we will sort transactions in the database according to the proposed
@@ -726,49 +722,30 @@ public class AlgoEFIM {
 	 * @param dataset the transaction database
 	 */
 	public void useUtilityBinArrayToCalculateLocalUtilityFirstTime(Dataset dataset) {
-
-		// Initialize utility bins for all items
 		utilityBinArrayLU = new int[dataset.getMaxItem() + 1];
-
-		// Scan the database to fill the utility bins
-		// For each transaction
-		for (int i = 0; i < dataset.getTransactions().size(); i++) {
-			Transaction transaction = dataset.getTransactions().get(i);
-			// for each item
-			for (int item : transaction.getItems()) {
-				// we add the transaction utility to the utility bin of the item
-				utilityBinArrayLU[item] += transaction.transactionUtility;
+		ListObject<Transaction> txs = dataset.transactions;
+		int size = txs.size();
+		for (int i = 0; i < size; i++) {
+			Transaction transaction = txs.get(i);
+			int tu = transaction.transactionUtility;
+			int[] items = transaction.items;
+			for (int j = 0; j < items.length; j++) {
+				utilityBinArrayLU[items[j]] += tu;
 			}
 		}
 	}
 
-	/**
-	 * Scan the initial database to calculate the sub-tree utility of each item
-	 * using a utility-bin array
-	 * 
-	 * @param dataset the transaction database
-	 */
 	public void useUtilityBinArrayToCalculateSubtreeUtilityFirstTime(Dataset dataset) {
-
-		int sumSU;
-		// Scan the database to fill the utility-bins of each item
-		// For each transaction
-		for (int b = 0; b < dataset.getTransactions().size(); b++) {
-			Transaction transaction = dataset.getTransactions().get(b);
-			// We will scan the transaction backward. Thus,
-			// the current sub-tree utility in that transaction is zero
-			// for the last item of the transaction.
-			sumSU = 0;
-
-			// For each item when reading the transaction backward
-			for (int i = transaction.getItems().length - 1; i >= 0; i--) {
-				// get the item
-				int item = transaction.getItems()[i];
-
-				// we add the utility of the current item to its sub-tree utility
-				sumSU += transaction.getUtilities()[i];
-				// we add the current sub-tree utility to the utility-bin of the item
-				utilityBinArraySU[item] += sumSU;
+		ListObject<Transaction> txs = dataset.transactions;
+		int size = txs.size();
+		for (int b = 0; b < size; b++) {
+			Transaction transaction = txs.get(b);
+			int[] items = transaction.items;
+			int[] utils = transaction.utilities;
+			int sumSU = 0;
+			for (int i = items.length - 1; i >= 0; i--) {
+				sumSU += utils[i];
+				utilityBinArraySU[items[i]] += sumSU;
 			}
 		}
 	}
