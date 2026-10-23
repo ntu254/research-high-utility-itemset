@@ -136,41 +136,36 @@ public class Transaction {
      * @param oldNamesToNewNames An array indicating for each old name, the corresponding new name.
      */
 	public void removeUnpromisingItems(int[] oldNamesToNewNames) {
-    	// In this method, we used buffers for temporary storing items and their utilities
-		// (tempItems and tempUtilities)
-		// This is for memory optimization.
-		
-    	// for each item
-    	int i = 0;
-    	for(int j=0; j< items.length;j++) {
-    		int item = items[j];
-    		
-    		// Convert from old name to new name
-    		int newName = oldNamesToNewNames[item];
-    		
-    		// if the item is promising (it has a new name)
-    		if(newName != 0) {
-    			// copy the item and its utility
-    			tempItems[i] = newName;
-    			tempUtilities[i] = utilities[j];
-    			i++;
-    		}else{
-    			// else subtract the utility of the item
-    			transactionUtility -= utilities[j];
-    		}
-    	}
-    	// copy the buffer of items back into the original array
-    	this.items = new int[i];
-    	System.arraycopy(tempItems, 0, this.items, 0, i);
-    	
-    	// copy the buffer of utilities back into the original array
-    	this.utilities = new int[i];
-    	System.arraycopy(tempUtilities, 0, this.utilities, 0, i);
-    	
-    	// Sort by increasing TWU values
-    	insertionSort(this.items, this.utilities);
+		int[] origItems = this.items;
+		int[] origUtils = this.utilities;
+		int len = origItems.length;
+		int tu = this.transactionUtility;
+
+		int i = 0;
+		for (int j = 0; j < len; j++) {
+			int item = origItems[j];
+			int newName = oldNamesToNewNames[item];
+			if (newName != 0) {
+				tempItems[i] = newName;
+				tempUtilities[i] = origUtils[j];
+				i++;
+			} else {
+				tu -= origUtils[j];
+			}
+		}
+		this.transactionUtility = tu;
+
+		int[] newItems = new int[i];
+		int[] newUtils = new int[i];
+		System.arraycopy(tempItems, 0, newItems, 0, i);
+		System.arraycopy(tempUtilities, 0, newUtils, 0, i);
+		this.items = newItems;
+		this.utilities = newUtils;
+
+		if (i > 1) {
+			insertionSort(newItems, newUtils);
+		}
 	}
-	
 	/**
 	 * Implementation of Insertion sort for integers.
 	 * This has an average performance of O(n log n)
