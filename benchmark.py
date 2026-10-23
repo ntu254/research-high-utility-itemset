@@ -30,10 +30,12 @@ BENCHMARK_CONFIGS = [
 
 
 def run_spmf(algorithm: str, dataset_path: Path, output_path: Path, min_util: int):
+    cp = f"build{os.pathsep}{JAR_PATH}"
     cmd = [
         "java",
-        "-jar",
-        str(JAR_PATH),
+        "-cp",
+        cp,
+        "ca.pfv.spmf.gui.Main",
         "run",
         algorithm,
         str(dataset_path),

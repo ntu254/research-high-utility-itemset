@@ -473,31 +473,31 @@ public class AlgoEFIM {
 				// Increase the number of transaction read
 				transactionReadingCount++;
 
-				// To record the time for performing binary searh
-				long timeBinaryLocal = System.currentTimeMillis();
-
-				// we remember the position where e appears.
-				// we will call this position an "offset"
 				int positionE = -1;
-				// Variables low and high for binary search
 				int low = transaction.offset;
 				int high = transaction.items.length - 1;
+				int[] tItems = transaction.items;
+
+				if (high < low || tItems[high] < e) {
+					transaction.offset = high + 1;
+					continue;
+				}
+				if (tItems[low] > e) {
+					continue;
+				}
 
 				// perform binary search to find e in the transaction
 				while (high >= low) {
 					int middle = (low + high) >>> 1; // divide by 2
-					if (transaction.items[middle] < e) {
+					if (tItems[middle] < e) {
 						low = middle + 1;
-					} else if (transaction.items[middle] == e) {
+					} else if (tItems[middle] == e) {
 						positionE = middle;
 						break;
 					} else {
 						high = middle - 1;
 					}
 				}
-				// record the time spent for performing the binary search
-				timeBinarySearch += System.currentTimeMillis() - timeBinaryLocal;
-
 //	        	if(prefixLength == 0 && newNamesToOldNames[e] == 385) {
 //		        	for(int i=0; i < transaction.getItems().length; i++) {
 //		        		if(transaction.getItems()[i] == e) {
