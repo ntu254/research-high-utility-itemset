@@ -155,7 +155,7 @@ public class AlgoEFIM {
 		// if the user choose to save to file
 		// create object for writing the output file
 		if (outputPath != null) {
-			writer = new BufferedWriter(new FileWriter(outputPath));
+			writer = new BufferedWriter(new FileWriter(outputPath), 65536);
 		} else {
 			// if the user choose to save to memory
 			writer = null;
@@ -257,52 +257,19 @@ public class AlgoEFIM {
 				 * Compare two transactions
 				 */
 				public int compare(Transaction t1, Transaction t2) {
-					// we will compare the two transaction items by items starting
-					// from the last items.
-					int pos1 = t1.items.length - 1;
-					int pos2 = t2.items.length - 1;
-
-					// if the first transaction is smaller than the second one
-					if (t1.items.length < t2.items.length) {
-						// while the current position in the first transaction is >0
-						while (pos1 >= 0) {
-							int subtraction = t2.items[pos2] - t1.items[pos1];
-							if (subtraction != 0) {
-								return subtraction;
-							}
-							pos1--;
-							pos2--;
+					int[] items1 = t1.items;
+					int[] items2 = t2.items;
+					int pos1 = items1.length - 1;
+					int pos2 = items2.length - 1;
+					while (pos1 >= 0 && pos2 >= 0) {
+						int diff = items2[pos2] - items1[pos1];
+						if (diff != 0) {
+							return diff;
 						}
-						// if they ware the same, they we compare based on length
-						return -1;
-
-						// else if the second transaction is smaller than the first one
-					} else if (t1.items.length > t2.items.length) {
-						// while the current position in the second transaction is >0
-						while (pos2 >= 0) {
-							int subtraction = t2.items[pos2] - t1.items[pos1];
-							if (subtraction != 0) {
-								return subtraction;
-							}
-							pos1--;
-							pos2--;
-						}
-						// if they are the same, they we compare based on length
-						return 1;
-
-					} else {
-						// else if both transactions have the same size
-						while (pos2 >= 0) {
-							int subtraction = t2.items[pos2] - t1.items[pos1];
-							if (subtraction != 0) {
-								return subtraction;
-							}
-							pos1--;
-							pos2--;
-						}
-						// if they ware the same, they we compare based on length
-						return 0;
+						pos1--;
+						pos2--;
 					}
+					return Integer.compare(items1.length, items2.length);
 				}
 
 			});
@@ -311,21 +278,14 @@ public class AlgoEFIM {
 			// After removing unpromising items, it may be possible that some transactions
 			// are empty. We will now remove these transactions from the database.
 			int emptyTransactionCount = 0;
-			// for each transaction
-			for (int i = 0; i < dataset.getTransactions().size(); i++) {
-				// if the transaction length is 0, increase the number of empty transactions
-				Transaction transaction = dataset.getTransactions().get(i);
-				if (transaction.items.length == 0) {
+			ListObject<Transaction> allTxs = dataset.transactions;
+			int totalCount = allTxs.size();
+			for (int i = 0; i < totalCount; i++) {
+				if (allTxs.get(i).items.length == 0) {
 					emptyTransactionCount++;
 				}
 			}
-			// To remove empty transactions, we just ignore the first transactions from the
-			// dataset
-			// The reason is that empty transactions are always at the begining of the
-			// dataset
-			// since transactions are sorted by size
-			dataset.transactions = dataset.transactions.immutableSubList(emptyTransactionCount,
-					dataset.transactions.size());
+			dataset.transactions = allTxs.immutableSubList(emptyTransactionCount, totalCount);
 
 		}
 
@@ -823,20 +783,15 @@ public class AlgoEFIM {
 		} else {
 			// if user wants to save the results to file
 			// create a stringuffer
-			StringBuffer buffer = new StringBuffer();
-			// append each item from the itemset to the stringbuffer, separated by spaces
+			StringBuilder buffer = new StringBuilder();
 			for (int i = 0; i <= tempPosition; i++) {
 				buffer.append(temp[i]);
 				if (i != tempPosition) {
 					buffer.append(' ');
 				}
 			}
-			// append the utility of the itemset
 			buffer.append(" #UTIL: ");
 			buffer.append(utility);
-
-			// write the stringbuffer to file and create a new line
-			// so that we are ready for writing the next itemset.
 			writer.write(buffer.toString());
 			writer.newLine();
 		}
