@@ -103,6 +103,11 @@ public class AlgoEFIM {
 
 	/** If true, sub-tree utility pruning will be performed */
 	private boolean activateSubtreeUtilityPruning;
+	/** Mark array for O(1) membership check of promising items */
+	private int[] itemToKeepMark;
+	/** Current epoch marker */
+	private int currentMarker = 1;
+
 
 	/**
 	 * Constructor
@@ -219,6 +224,9 @@ public class AlgoEFIM {
 		newItemCount = itemsToKeep.size();
 		// initialize the utility-bin array for counting the subtree utility
 		utilityBinArraySU = new int[newItemCount + 1];
+		itemToKeepMark = new int[newItemCount + 1];
+		currentMarker = 1;
+
 
 		// if in debug mode, print to the old names and new names to the console
 		// to check if they are correct
@@ -463,8 +471,6 @@ public class AlgoEFIM {
 			Transaction previousTransaction = null;
 			int consecutiveMergeCount = 0;
 
-			// this variable is to record the time for performing intersection
-			long timeFirstIntersection = System.currentTimeMillis();
 
 			// For each transaction
 			for (int w = 0; w < transactionsOfP.size(); w++) {
@@ -615,8 +621,6 @@ public class AlgoEFIM {
 					transaction.offset = low;
 				}
 			}
-			// remember the total time for peforming the database projection
-			timeIntersections += (System.currentTimeMillis() - timeFirstIntersection);
 
 			// Add the last read transaction to the database if there is one
 			if (previousTransaction != null) {
@@ -637,8 +641,6 @@ public class AlgoEFIM {
 			// all items that could be appended to PU{e} ====
 			useUtilityBinArraysToCalculateUpperBounds(transactionsPe, j, itemsToKeep);
 
-			// we now record time for identifying promising items
-			long initialTime = System.currentTimeMillis();
 
 			// We will create the new list of secondary items
 			ArrayListInt newItemsToKeep = new ArrayListInt();
@@ -664,23 +666,22 @@ public class AlgoEFIM {
 					newItemsToKeep.add(itemk);
 				}
 			}
-			// update the total time for identifying promising items
-			timeIdentifyPromisingItems += (System.currentTimeMillis() - initialTime);
-
 			// === recursive call to explore larger itemsets
 			if (activateSubtreeUtilityPruning) {
-				// if sub-tree utility pruning is activated, we consider primary and secondary
-				// items
-				backtrackingEFIM(transactionsPe, newItemsToKeep, newItemsToExplore, prefixLength + 1);
+				if (!newItemsToExplore.isEmpty() && !transactionsPe.isEmpty()) {
+					backtrackingEFIM(transactionsPe, newItemsToKeep, newItemsToExplore, prefixLength + 1);
+				}
 			} else {
-				// if sub-tree utility pruning is deactivated, we consider secondary items also
-				// as primary items
-				backtrackingEFIM(transactionsPe, newItemsToKeep, newItemsToKeep, prefixLength + 1);
+				if (!newItemsToKeep.isEmpty() && !transactionsPe.isEmpty()) {
+					backtrackingEFIM(transactionsPe, newItemsToKeep, newItemsToKeep, prefixLength + 1);
+				}
 			}
 		}
 
-		// check the maximum memory usage for statistics purpose
-		MemoryLogger.getInstance().checkMemory();
+		// check the maximum memory usage periodically
+		if ((candidateCount & 63) == 0) {
+			MemoryLogger.getInstance().checkMemory();
+		}
 	}
 
 	/**
@@ -786,70 +787,42 @@ public class AlgoEFIM {
 		// we will record the time used by this method for statistics purpose
 		long initialTime = System.currentTimeMillis();
 
+		currentMarker++;
+		if (currentMarker == Integer.MAX_VALUE) {
+			currentMarker = 1;
+			Arrays.fill(itemToKeepMark, 0);
+		}
+
 		// For each promising item > e according to the total order
 		for (int i = j + 1; i < itemsToKeep.size(); i++) {
 			int item = itemsToKeep.get(i);
-			// We reset the utility bins of that item for computing the sub-tree utility and
-			// local utility
 			utilityBinArraySU[item] = 0;
 			utilityBinArrayLU[item] = 0;
+			itemToKeepMark[item] = currentMarker;
 		}
 
-		int sumRemainingUtility;
 		// for each transaction
 		for (int z = 0; z < transactionsPe.size(); z++) {
 			Transaction transaction = transactionsPe.get(z);
-			// count the number of transactions read
 			transactionReadingCount++;
 
-			// We reset the sum of reamining utility to 0;
-			sumRemainingUtility = 0;
-			// we set high to the last promising item for doing the binary search
-			int high = itemsToKeep.size() - 1;
+			int sumRemainingUtility = 0;
+			int[] tItems = transaction.items;
+			int[] tUtils = transaction.utilities;
+			int prefixUtility = transaction.prefixUtility;
+			int txAndPrefixUtility = transaction.transactionUtility + prefixUtility;
+			int offset = transaction.offset;
 
-			// for each item in the transaction that is greater than i when reading the
-			// transaction backward
-			// Note: >= is correct here. It should not be >.
-			for (int i = transaction.getItems().length - 1; i >= transaction.offset; i--) {
-				// get the item
-				int item = transaction.getItems()[i];
-
-				// We will check if this item is promising using a binary search over promising
-				// items.
-
-				// This variable will be used as a flag to indicate that we found the item or
-				// not using the binary search
-				boolean contains = false;
-				// we set "low" for the binary search to the first promising item position
-				int low = 0;
-
-				// do the binary search
-				while (high >= low) {
-					int middle = (low + high) >>> 1; // divide by 2
-					int itemMiddle = itemsToKeep.get(middle);
-					if (itemMiddle == item) {
-						// if we found the item, then we stop
-						contains = true;
-						break;
-					} else if (itemMiddle < item) {
-						low = middle + 1;
-					} else {
-						high = middle - 1;
-					}
-				}
-				// if the item is promising
-				if (contains) {
-					// We add the utility of this item to the sum of remaining utility
-					sumRemainingUtility += transaction.getUtilities()[i];
-					// We update the sub-tree utility of that item in its utility-bin
-					utilityBinArraySU[item] += sumRemainingUtility + transaction.prefixUtility;
-					// We update the local utility of that item in its utility-bin
-					utilityBinArrayLU[item] += transaction.transactionUtility + transaction.prefixUtility;
+			// for each item in the transaction backward
+			for (int i = tItems.length - 1; i >= offset; i--) {
+				int item = tItems[i];
+				if (itemToKeepMark[item] == currentMarker) {
+					sumRemainingUtility += tUtils[i];
+					utilityBinArraySU[item] += sumRemainingUtility + prefixUtility;
+					utilityBinArrayLU[item] += txAndPrefixUtility;
 				}
 			}
 		}
-		// we update the time for database reduction for statistics purpose
-		timeDatabaseReduction += (System.currentTimeMillis() - initialTime);
 	}
 
 	/**

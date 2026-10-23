@@ -33,6 +33,9 @@ def run_spmf(algorithm: str, dataset_path: Path, output_path: Path, min_util: in
     cp = f"build{os.pathsep}{JAR_PATH}"
     cmd = [
         "java",
+        "-XX:+UseG1GC",
+        "-Xms256m",
+        "-Xmx2g",
         "-cp",
         cp,
         "ca.pfv.spmf.gui.Main",
